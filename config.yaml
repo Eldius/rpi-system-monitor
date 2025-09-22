@@ -1,0 +1,4 @@
+---
+monitor:
+  temperature:
+    enabled: true
