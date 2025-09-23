@@ -17,14 +17,15 @@ var (
 
 var (
 	TemperatureProbeEnabledProp = setup.Prop{
-		Key:   "monitor.temperature.enabled",
+		Key:   "monitor.server.temperature_probe.enabled",
 		Value: true,
 	}
 
-	ConfigFileLocations = []string{
+	CfgFileLocations = []string{
 		"~/.config/rpi-monitor",
+		"~/.rpi-monitor",
 		"/etc/rpi-monitor",
-		".",
+		"./",
 		"./config",
 	}
 )
@@ -35,9 +36,9 @@ func GetTemperatureProbeEnabled() bool {
 
 func GetVersionInfo() map[string]string {
 	return map[string]string{
-		"Version":   Version,
-		"BuildDate": BuildDate,
-		"Commit":    Commit,
-		"AppName":   AppName,
+		"version":   Version,
+		"buildDate": BuildDate,
+		"commit":    Commit,
+		"appName":   AppName,
 	}
 }

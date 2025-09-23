@@ -8,7 +8,7 @@
 
 version: 2
 
-project_name: rpi-system-monitor
+project_name: rpi-telemetry-monitor
 
 before:
   hooks:
@@ -20,7 +20,7 @@ before:
 builds:
   - id: remote
     main: ./cmd/server/
-    binary: rpi-system-monitor-remote
+    binary: rpi-telemetry-monitor-remote
     env:
       - CGO_ENABLED=0
     goos:
@@ -39,10 +39,10 @@ builds:
       - -a
     ldflags:
       - -extldflags "-static"
-      - -X github.com/eldius/rpi-system-monitor/internal/config.BuildDate={{.Date}}
-      - -X github.com/eldius/rpi-system-monitor/internal/config.Version={{.Version}}
-      - -X github.com/eldius/rpi-system-monitor/internal/config.CommitDate={{.CommitDate}}
-      - -X github.com/eldius/rpi-system-monitor/internal/config.Commit={{.Commit}}
+      - -X github.com/eldius/rpi-telemetry-monitor/internal/config.BuildDate={{.Date}}
+      - -X github.com/eldius/rpi-telemetry-monitor/internal/config.Version={{.Version}}
+      - -X github.com/eldius/rpi-telemetry-monitor/internal/config.CommitDate={{.CommitDate}}
+      - -X github.com/eldius/rpi-telemetry-monitor/internal/config.Commit={{.Commit}}
 
 archives:
   - formats: [tar.gz]
