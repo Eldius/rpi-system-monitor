@@ -18,9 +18,9 @@ before:
     - go generate ./...
 
 builds:
-  - id: remote
-    main: ./cmd/server/
-    binary: rpi-telemetry-monitor-remote
+  - id: agent
+    main: ./cmd/agent/
+    binary: rpi-monitor-agent
     env:
       - CGO_ENABLED=0
     goos:

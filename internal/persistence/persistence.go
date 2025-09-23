@@ -3,13 +3,15 @@ package persistence
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"math"
+	"slices"
+	"time"
+
 	"github.com/eldius/rpi-system-monitor/internal/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/tsdb"
 	"github.com/prometheus/prometheus/tsdb/chunkenc"
-	"log/slog"
-	"math"
-	"time"
 )
 
 func openDB() (*tsdb.DB, error) {
@@ -57,6 +59,9 @@ func Get(ctx context.Context) ([]model.ProbesResult, error) {
 		return nil, err
 	}
 	cpuTS, err := getCPUUsage(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 
 	var result []model.ProbesResult
 	for k, v := range tempTS {
@@ -77,6 +82,10 @@ func Get(ctx context.Context) ([]model.ProbesResult, error) {
 			},
 		})
 	}
+
+	slices.SortFunc(result, func(a, b model.ProbesResult) int {
+		return int(a.Timestamp.Unix() - b.Timestamp.Unix())
+	})
 
 	return result, nil
 }
@@ -203,7 +212,7 @@ func fetch(ctx context.Context, db *tsdb.DB, lbl [2]string) (map[int64]float64, 
 	defer func() {
 		_ = querier.Close()
 	}()
-	queryResult := querier.Select(ctx, true, nil, labels.MustNewMatcher(labels.MatchEqual, lbl[0], lbl[1]))
+	queryResult := querier.Select(ctx, false, nil, labels.MustNewMatcher(labels.MatchEqual, lbl[0], lbl[1]))
 
 	var result = make(map[int64]float64)
 	for queryResult.Next() {
