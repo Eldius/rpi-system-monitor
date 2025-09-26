@@ -1,5 +1,6 @@
 
 REMOTE_HOST ?= "192.168.0.130"
+USER := "eldius"
 
 server:
 	go run ./cmd/server/ probe
