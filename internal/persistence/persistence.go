@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"fmt"
+	"github.com/go-kit/log"
 	"log/slog"
 	"math"
 	"slices"
@@ -14,8 +15,22 @@ import (
 	"github.com/prometheus/prometheus/tsdb/chunkenc"
 )
 
+var (
+	_ log.Logger = &logger{}
+)
+
+type logger struct {
+	l *slog.Logger
+}
+
+func (l *logger) Log(keyvals ...interface{}) error {
+	l.l.Debug("[tsdb_log]", keyvals...)
+
+	return nil
+}
+
 func openDB() (*tsdb.DB, error) {
-	db, err := tsdb.Open(".db/tsdb.db", slog.With("pkg", "persistence"), nil, tsdb.DefaultOptions(), nil)
+	db, err := tsdb.Open(".db/tsdb.db", &logger{l: slog.With("pkg", "persistence")}, nil, tsdb.DefaultOptions(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}

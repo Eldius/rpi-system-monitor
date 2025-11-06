@@ -2,7 +2,7 @@ package telemetry
 
 import (
 	"context"
-	"github.com/eldius/rpi-system-monitor/internal/config"
+	"github.com/eldius/rpi-system-monitor/internal/feature_toggle"
 	"github.com/eldius/rpi-system-monitor/internal/model"
 	"sync"
 	"time"
@@ -17,24 +17,20 @@ func Measure(ctx context.Context) model.ProbesResult {
 	var result model.ProbesResult
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
+	wg.Go(func() {
 		result.CPU = measureCPU(ctx)
-	}(&wg)
+	})
 
-	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
+	wg.Go(func() {
 		result.Memory = measureMemory(ctx)
-	}(&wg)
+	})
 
-	if config.GetTemperatureProbeEnabled() {
-		wg.Add(1)
-		go func(wg *sync.WaitGroup) {
-			defer wg.Done()
+	_ = feature_toggle.FeatureToggle(ctx, "monitor.server.temperature_probe.enabled", func(ctx context.Context) error {
+		wg.Go(func() {
 			result.Temp = measureTemperature()
-		}(&wg)
-	}
+		})
+		return nil
+	})
 
 	result.Timestamp = time.Now()
 

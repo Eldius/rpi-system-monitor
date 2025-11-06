@@ -14,6 +14,10 @@ clean-dist:
 dist: clean-dist
 	mkdir dist
 
+push:
+	#go tool push -host 192.168.0.42 -v periph.io/x/cmd/bmxx80
+	go tool push -host $(REMOTE_HOST) -v ./cmd/agent
+
 dist/rpi-monitor-agent: dist
 	$(eval GIT_SHORT_HASH=$(shell git rev-parse --short HEAD))
 	@echo "GIT_SHORT_HASH: $(GIT_SHORT_HASH)"
@@ -25,21 +29,17 @@ dist/rpi-monitor-agent: dist
 			-ldflags="-extldflags '-static' -X 'github.com/eldius/rpi-system-monitor/internal/config.BuildDate=$(BUILD_TIME)' -X 'github.com/eldius/rpi-system-monitor/internal/config.Version=dev' -X 'github.com/eldius/rpi-system-monitor/internal/config.Commit=$(GIT_SHORT_HASH)'" \
                   ./cmd/agent
 
-remote: dist/rpi-monitor-agent
-	-ssh "$(USER)@$(REMOTE_HOST)" "rm /tmp/rpi-monitor-agent"
-	-ssh "$(USER)@$(REMOTE_HOST)" "rm /tmp/execution.log"
-	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "dist/rpi-monitor-agent" "/tmp/rpi-monitor-agent"
-	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "config.yaml" "/tmp/"
-	ssh "$(USER)@$(REMOTE_HOST)" "cd /tmp ; /tmp/rpi-monitor-agent probe"
-	ssh "$(USER)@$(REMOTE_HOST)" "cat /tmp/execution.log"
+remote: push
+	-ssh "$(USER)@$(REMOTE_HOST)" "rm ~/execution.log"
+	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "config.yaml" "~"
+	ssh "$(USER)@$(REMOTE_HOST)" "~/agent probe"
+	ssh "$(USER)@$(REMOTE_HOST)" "cat ~/execution.log"
 
-remote-query: dist/rpi-monitor-agent
-	-ssh "$(USER)@$(REMOTE_HOST)" "rm /tmp/rpi-monitor-agent"
-	-ssh "$(USER)@$(REMOTE_HOST)" "rm /tmp/execution.log"
-	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "dist/rpi-monitor-agent" "/tmp/rpi-monitor-agent"
-	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "config.yaml" "/tmp/"
-	ssh "$(USER)@$(REMOTE_HOST)" "cd /tmp ; /tmp/rpi-monitor-agent probe show"
-	ssh "$(USER)@$(REMOTE_HOST)" "cat /tmp/execution.log"
+remote-query: push
+	-ssh "$(USER)@$(REMOTE_HOST)" "rm ~/execution.log"
+	./scripts/send_file.sh $(USER) $(REMOTE_HOST) "config.yaml" "~"
+	ssh "$(USER)@$(REMOTE_HOST)" "~/agent probe show"
+	ssh "$(USER)@$(REMOTE_HOST)" "cat ~/execution.log"
 
 snapshot:
 	goreleaser release --snapshot --clean
