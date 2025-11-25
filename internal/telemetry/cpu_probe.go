@@ -2,11 +2,11 @@ package telemetry
 
 import (
 	"context"
-	"fmt"
-	"github.com/eldius/rpi-system-monitor/internal/model"
-	"github.com/shirou/gopsutil/v3/cpu"
 	"log/slog"
 	"time"
+
+	"github.com/eldius/rpi-system-monitor/internal/model"
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 func measureCPU(ctx context.Context) model.CPUResult {
@@ -17,13 +17,11 @@ func measureCPU(ctx context.Context) model.CPUResult {
 		return result
 	}
 	result.CPUCount = int64(cpuCount)
-	fmt.Println("cpu count:", cpuCount)
 	percentages, err := cpu.Percent(time.Second, false)
 	if err != nil {
 		slog.With("error", err).ErrorContext(ctx, "failed to get CPU usage")
 		return result
 	}
-	fmt.Println("cpu percentages:", percentages)
 
 	result.CPUUsage = percentages[0]
 

@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/eldius/rpi-system-monitor/internal/adapter"
 
+	"github.com/eldius/rpi-system-monitor/internal/adapter"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +33,7 @@ var probeShowCmd = &cobra.Command{
 		}
 		fmt.Println("######################################################")
 		fmt.Println("")
+
 	},
 }
 

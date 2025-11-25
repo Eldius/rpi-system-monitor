@@ -41,6 +41,15 @@ remote-query: push
 	ssh "$(USER)@$(REMOTE_HOST)" "~/agent probe show"
 	ssh "$(USER)@$(REMOTE_HOST)" "cat ~/execution.log"
 
+probe-show:
+	go run ./cmd/agent/ probe show
+
+probe:
+	go run ./cmd/agent/ probe
+
+monitor:
+	go run ./cmd/agent/ monitor
+
 snapshot:
 	goreleaser release --snapshot --clean
 

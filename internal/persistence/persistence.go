@@ -3,11 +3,12 @@ package persistence
 import (
 	"context"
 	"fmt"
-	"github.com/go-kit/log"
 	"log/slog"
 	"math"
 	"slices"
 	"time"
+
+	"github.com/go-kit/log"
 
 	"github.com/eldius/rpi-system-monitor/internal/model"
 	"github.com/prometheus/prometheus/model/labels"
@@ -211,11 +212,10 @@ func persist(ctx context.Context, db *tsdb.DB, timestamp int64, value float64, l
 	defer func() {
 		_ = appender.Rollback()
 	}()
-	ref, err := appender.Append(0, labels.FromStrings(lbl...), timestamp, value)
+	_, err := appender.Append(0, labels.FromStrings(lbl...), timestamp, value)
 	if err != nil {
 		return fmt.Errorf("appending temperature: %w", err)
 	}
-	fmt.Println("ref:", ref)
 	return appender.Commit()
 }
 
@@ -232,16 +232,12 @@ func fetch(ctx context.Context, db *tsdb.DB, lbl [2]string) (map[int64]float64, 
 	var result = make(map[int64]float64)
 	for queryResult.Next() {
 		series := queryResult.At()
-		fmt.Println("series:", series.Labels().String())
 
 		it := series.Iterator(nil)
 		for it.Next() == chunkenc.ValFloat {
 			ts, v := it.At() // We ignore the timestamp here, only to have a predictable output we can test against (below)
-			fmt.Println("sample", v)
 			result[ts] = v
 		}
-
-		fmt.Println("it.Err():", it.Err())
 	}
 
 	return result, nil
