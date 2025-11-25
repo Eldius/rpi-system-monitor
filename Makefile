@@ -44,6 +44,8 @@ remote-query: push
 snapshot:
 	goreleaser release --snapshot --clean
 
+test:
+	go test -cover ./...
 
 lint:
 	golangci-lint run
@@ -51,7 +53,7 @@ lint:
 vulncheck:
 	go tool govulncheck ./...
 
-validate: lint vulncheck
+validate: lint vulncheck test
 	@echo ""
 	@echo ""
 	@echo "#######################"
