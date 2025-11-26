@@ -7,37 +7,50 @@ import (
 	"os"
 	"time"
 
-	"github.com/NimbleMarkets/ntcharts/sparkline"
+	"github.com/NimbleMarkets/ntcharts/canvas/runes"
+	"github.com/NimbleMarkets/ntcharts/linechart/timeserieslinechart"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/eldius/rpi-system-monitor/internal/adapter"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // --- Constantes e Estilos ---
 
 const (
 	width  = 60
-	height = 10
+	height = 7
+)
+
+var (
+	_ tea.Model = &hostMetricsDisplayModel{}
 )
 
 var (
 	// Estilos Lipgloss para as caixas
+
+	defaultStyle = lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("63")) // purple
+
 	borderStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
-			Padding(0, 1)
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1)
 
 	headerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
-			Bold(true).
-			Padding(0, 1)
+		Foreground(lipgloss.Color("205")).
+		Bold(true).
+		Padding(0, 1)
+
+	graphLineStyle1 = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("4")) // blue
+
+	axisStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("3")) // yellow
 
 	labelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			PaddingLeft(1)
-
-	chartStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("63"))
+		Foreground(lipgloss.Color("6")) // cyan
 	/*
 		blockStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("63")) // purple
@@ -67,9 +80,11 @@ type hostMetricsDisplayModel struct {
 	ip       string
 
 	// Gráficos do Ntcharts
-	cpuChart  *sparkline.Model
-	memChart  *sparkline.Model
-	tempChart *sparkline.Model
+	cpuChart  *timeserieslinechart.Model
+	memChart  *timeserieslinechart.Model
+	tempChart *timeserieslinechart.Model
+
+	zm *zone.Manager
 
 	// Dados brutos (simulados para o exemplo)
 	tickCount int
@@ -78,13 +93,13 @@ type hostMetricsDisplayModel struct {
 }
 
 // initialModel configura o estado inicial
-func initialModel(ctx context.Context) hostMetricsDisplayModel {
+func initialModel(ctx context.Context) *hostMetricsDisplayModel {
 	// Obter Hostname e IP reais
 	host, _ := os.Hostname()
 	ip := getOutboundIP()
 
 	// Configuração base dos gráficos
-	//lcConfig := sparkline.Config{
+	//lcConfig := linechart.Config{
 	//	Width:  width,
 	//	Height: height,
 	//	MinY:   0,
@@ -98,14 +113,24 @@ func initialModel(ctx context.Context) hostMetricsDisplayModel {
 			temp = append(temp, v.Temp.Temperature)
 		}
 
-		cpuChart := sparkline.New(width, height, sparkline.WithData(cpuUsg))
-		memChart := sparkline.New(width, height, sparkline.WithData(memUsg))
-		tempChart := sparkline.New(width, height, sparkline.WithData(temp))
+		cpuChart := linechart.New(width, height, linechart.WithData(cpuUsg))
+		memChart := linechart.New(width, height, linechart.WithData(memUsg))
+		tempChart := linechart.New(width, height, linechart.WithData(temp))
 	*/
+	/*
+		cpuChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 100)
+		memChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 100)
+		tempChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 0)
+	*/
+	cpuChart := timeserieslinechart.New(width, height)
+	memChart := timeserieslinechart.New(width, height)
+	tempChart := timeserieslinechart.New(width, height)
 
-	cpuChart := sparkline.New(width, height, sparkline.WithStyle(chartStyle))
-	memChart := sparkline.New(width, height, sparkline.WithStyle(chartStyle))
-	tempChart := sparkline.New(width, height, sparkline.WithStyle(chartStyle))
+	zm := zone.New()
+
+	setupMetricChart(&cpuChart, zm)
+	setupMetricChart(&memChart, zm)
+	setupMetricChart(&tempChart, zm)
 
 	m := hostMetricsDisplayModel{
 		hostname:  host,
@@ -116,18 +141,30 @@ func initialModel(ctx context.Context) hostMetricsDisplayModel {
 		ctx:       ctx,
 	}
 
-	return m
+	return &m
+}
+
+func setupMetricChart(c *timeserieslinechart.Model, zm *zone.Manager) {
+	c.AxisStyle = axisStyle
+	c.LabelStyle = labelStyle
+	c.XLabelFormatter = timeserieslinechart.HourTimeLabelFormatter()
+	c.UpdateHandler = timeserieslinechart.SecondUpdateHandler(1)
+	c.SetYRange(0, 100)     // set expected Y values (values can be less or greater than what is displayed)
+	c.SetViewYRange(0, 100) // setting display Y values will fail unless set expected Y values first
+	c.SetStyle(graphLineStyle1)
+	c.SetLineStyle(runes.ThinLineStyle) // ThinLineStyle replaces default linechart arcline rune style
+	c.SetZoneManager(zm)
 }
 
 // --- Métodos do Bubble Tea ---
 
-func (m hostMetricsDisplayModel) Init() tea.Cmd {
+func (m *hostMetricsDisplayModel) Init() tea.Cmd {
 	return tea.Batch(
 		tickCmd(), // Inicia o loop de atualização
 	)
 }
 
-func (m hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.KeyMsg:
@@ -146,25 +183,31 @@ func (m hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fmt.Println(err)
 			return m, tea.Quit
 		}
-		cpuVal := measures.CPU.CPUUsage
-		memVal := measures.Memory.MemoryUsagePercentage
-		tempVal := measures.Temp.Temperature
+		ts := measures.Timestamp
+		cpuVal := timeserieslinechart.TimePoint{Time: ts, Value: measures.CPU.CPUUsage}
+		memVal := timeserieslinechart.TimePoint{Time: ts, Value: measures.Memory.MemoryUsagePercentage}
+		tempVal := timeserieslinechart.TimePoint{Time: ts, Value: measures.Temp.Temperature}
 
-		// Atualiza os gráficos
-		// Ntcharts usa coordenadas normalizadas ou raw. Aqui empurramos valores na timeline.
 		m.cpuChart.Push(cpuVal)
 		m.memChart.Push(memVal)
 		m.tempChart.Push(tempVal)
 
-		_, _ = fmt.Fprint(os.Stdout, "\007")
+		s := lipgloss.JoinHorizontal(lipgloss.Top,
+			lipgloss.JoinVertical(lipgloss.Left,
+				defaultStyle.Render(m.cpuChart.View()),
+				defaultStyle.Render(m.memChart.View()),
+				defaultStyle.Render(m.tempChart.View()),
+			),
+		) + "\n"
 
+		m.zm.Scan(s)
 		return m, tickCmd()
 	}
 
 	return m, nil
 }
 
-func (m hostMetricsDisplayModel) View() string {
+func (m *hostMetricsDisplayModel) View() string {
 	// Renderiza os gráficos para strings
 	cpuView := m.cpuChart.View()
 	memView := m.memChart.View()
@@ -209,7 +252,7 @@ func getOutboundIP() string {
 	if err != nil {
 		return "Desconhecido"
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()
 }
