@@ -21,15 +21,8 @@ var borderStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("63")).
 	Padding(0, 1)
 
-var defaultStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.NormalBorder()).
-	BorderForeground(lipgloss.Color("63")) // purple
-
 var graphLineStyle1 = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("4")) // blue
-
-var graphLineStyle2 = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("10")) // green
 
 var axisStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("3")) // yellow

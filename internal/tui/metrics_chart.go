@@ -29,43 +29,24 @@ var (
 var (
 	// Estilos Lipgloss para as caixas
 
-	defaultStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("63")) // purple
-
 	borderStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1)
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("63")).
+			Padding(0, 1)
 
 	headerStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205")).
-		Bold(true).
-		Padding(0, 1)
+			Foreground(lipgloss.Color("205")).
+			Bold(true).
+			Padding(0, 1)
 
 	graphLineStyle1 = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("4")) // blue
+			Foreground(lipgloss.Color("4")) // blue
 
 	axisStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("3")) // yellow
+			Foreground(lipgloss.Color("3")) // yellow
 
 	labelStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("6")) // cyan
-	/*
-		blockStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("63")) // purple
-
-		blockStyle2 = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("9")). // red
-				Background(lipgloss.Color("2"))  // green
-
-		blockStyle3 = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("6")). // cyan
-				Background(lipgloss.Color("3"))  // yellow
-
-		blockStyle4 = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("3")) // yellow
-	*/
+			Foreground(lipgloss.Color("6")) // cyan
 )
 
 // --- Tipos de Mensagem ---
@@ -98,30 +79,6 @@ func initialModel(ctx context.Context) *hostMetricsDisplayModel {
 	host, _ := os.Hostname()
 	ip := getOutboundIP()
 
-	// Configuração base dos gráficos
-	//lcConfig := linechart.Config{
-	//	Width:  width,
-	//	Height: height,
-	//	MinY:   0,
-	//	MaxY:   100,
-	//}
-	/*
-		var cpuUsg, memUsg, temp []float64
-		for _, v := range data {
-			cpuUsg = append(cpuUsg, v.CPU.CPUUsage)
-			memUsg = append(memUsg, v.Memory.MemoryUsagePercentage)
-			temp = append(temp, v.Temp.Temperature)
-		}
-
-		cpuChart := linechart.New(width, height, linechart.WithData(cpuUsg))
-		memChart := linechart.New(width, height, linechart.WithData(memUsg))
-		tempChart := linechart.New(width, height, linechart.WithData(temp))
-	*/
-	/*
-		cpuChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 100)
-		memChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 100)
-		tempChart := linechart.New(width, height, 0, 9999999999999999999999, 0, 0)
-	*/
 	cpuChart := timeserieslinechart.New(width, height)
 	memChart := timeserieslinechart.New(width, height)
 	tempChart := timeserieslinechart.New(width, height)
@@ -199,15 +156,6 @@ func (m *hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.memChart.Draw()
 		m.tempChart.Draw()
 
-		s := lipgloss.JoinHorizontal(lipgloss.Top,
-			lipgloss.JoinVertical(lipgloss.Left,
-				defaultStyle.Render(m.cpuChart.View()),
-				defaultStyle.Render(m.memChart.View()),
-				defaultStyle.Render(m.tempChart.View()),
-			),
-		) + "\n"
-
-		m.zm.Scan(s)
 		return m, tickCmd()
 	}
 
@@ -228,11 +176,18 @@ func (m *hostMetricsDisplayModel) View() string {
 		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("CPU Usage (%)"), cpuView),
 	)
 	memBox := borderStyle.Render(
-		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("Memory Usage (%)"), memView),
+		lipgloss.JoinVertical(lipgloss.Right, labelStyle.Render("Memory Usage (%)"), memView),
 	)
 	tempBox := borderStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("Temperature (°C)"), tempView),
 	)
+
+	s := lipgloss.JoinHorizontal(lipgloss.Top,
+		cpuBox,
+		memBox,
+	) + lipgloss.JoinHorizontal(lipgloss.Bottom, tempBox) + "\n"
+
+	m.zm.Scan(s)
 
 	// Layout final: Cabeçalho em cima, gráficos lado a lado (se couber) ou vertical
 	// Aqui usaremos vertical para garantir visualização simples
