@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/NimbleMarkets/ntcharts/canvas/runes"
@@ -12,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/eldius/rpi-system-monitor/internal/adapter"
+	"github.com/eldius/rpi-system-monitor/internal/tui/helper"
 	zone "github.com/lrstanley/bubblezone"
-	"golang.org/x/term"
 )
 
 var borderStyle = lipgloss.NewStyle().
@@ -95,41 +94,11 @@ func tickCmd() tea.Cmd {
 	})
 }
 func Start(ctx context.Context) error {
-	width := 36
-	height := 8
 	minYValue := 0.0
 	maxYValue := 100.0
 
-	var windowSize struct {
-		Width  int
-		Height int
-	}
+	windowSize, _ := helper.GetTerminalSize()
 
-	fd := int(os.Stdin.Fd())
-
-	// Check if the file descriptor is a terminal
-	if term.IsTerminal(fd) {
-		// Get the terminal size
-		w, h, err := term.GetSize(fd)
-		if err != nil {
-			fmt.Printf("Error getting terminal size: %v\n", err)
-			return err
-		}
-
-		windowSize.Width = 3 * (w / 4)
-		windowSize.Height = 3 * (h / 4)
-		fmt.Printf("Terminal dimensions: Width = %d, Height = %d\n", w, h)
-	} else {
-		fmt.Println("Not running in a terminal.")
-		windowSize.Width = width
-		windowSize.Height = height
-	}
-
-	// timeserieslinecharts creates line charts starting with time as time.Now()
-	// There are two sets of charts, one show regular lines and one showing braille lines
-	// Pressing keys will insert random Y value data into chart with time.Now() (when key was pressed)
-
-	// create new bubblezone Manager to enable mouse support to zoom in and out of chart
 	zoneManager := zone.New()
 
 	// timeserieslinechart 1 created with New() and setting options afterwards

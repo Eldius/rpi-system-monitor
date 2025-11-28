@@ -12,14 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/eldius/rpi-system-monitor/internal/adapter"
+	"github.com/eldius/rpi-system-monitor/internal/tui/helper"
 	zone "github.com/lrstanley/bubblezone"
-)
-
-// --- Constantes e Estilos ---
-
-const (
-	width  = 60
-	height = 7
 )
 
 var (
@@ -30,23 +24,23 @@ var (
 	// Estilos Lipgloss para as caixas
 
 	borderStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
-			Padding(0, 1)
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1)
 
 	headerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
-			Bold(true).
-			Padding(0, 1)
+		Foreground(lipgloss.Color("205")).
+		Bold(true).
+		Padding(0, 1)
 
 	graphLineStyle1 = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("4")) // blue
+		Foreground(lipgloss.Color("4")) // blue
 
 	axisStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("3")) // yellow
+		Foreground(lipgloss.Color("3")) // yellow
 
 	labelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("6")) // cyan
+		Foreground(lipgloss.Color("6")) // cyan
 )
 
 // --- Tipos de Mensagem ---
@@ -79,9 +73,14 @@ func initialModel(ctx context.Context) *hostMetricsDisplayModel {
 	host, _ := os.Hostname()
 	ip := getOutboundIP()
 
-	cpuChart := timeserieslinechart.New(width, height)
-	memChart := timeserieslinechart.New(width, height)
-	tempChart := timeserieslinechart.New(width, height)
+	windowSize, _ := helper.GetTerminalSize()
+
+	w := windowSize.Width - 10
+	h := (windowSize.Height - 5) / 4
+
+	cpuChart := timeserieslinechart.New(w, h)
+	memChart := timeserieslinechart.New(w, h)
+	tempChart := timeserieslinechart.New(w, h)
 
 	zm := zone.New()
 
@@ -129,7 +128,7 @@ func (m *hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
+		case "q", tea.KeyCtrlC.String(), tea.KeyEscape.String():
 			return m, tea.Quit
 		}
 
@@ -169,33 +168,32 @@ func (m *hostMetricsDisplayModel) View() string {
 	tempView := m.tempChart.View()
 
 	// Constrói o cabeçalho
-	header := headerStyle.Render(fmt.Sprintf("🖥️  HOST: %s  |  🌐 IP: %s", m.hostname, m.ip))
+	header := headerStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Top, fmt.Sprintf("🖥️  HOST: %s  |  🌐 IP: %s", m.hostname, m.ip)),
+	) + "\n"
 
 	// Cria caixas com títulos para cada métrica
 	cpuBox := borderStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("CPU Usage (%)"), cpuView),
 	)
 	memBox := borderStyle.Render(
-		lipgloss.JoinVertical(lipgloss.Right, labelStyle.Render("Memory Usage (%)"), memView),
+		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("Memory Usage (%)"), memView),
 	)
 	tempBox := borderStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("Temperature (°C)"), tempView),
 	)
 
-	s := lipgloss.JoinHorizontal(lipgloss.Top,
-		cpuBox,
-		memBox,
-	) + lipgloss.JoinHorizontal(lipgloss.Bottom, tempBox) + "\n"
-
-	m.zm.Scan(s)
-
 	// Layout final: Cabeçalho em cima, gráficos lado a lado (se couber) ou vertical
 	// Aqui usaremos vertical para garantir visualização simples
 	body := lipgloss.JoinVertical(lipgloss.Left,
 		header,
-		lipgloss.JoinVertical(lipgloss.Left, cpuBox, memBox, tempBox),
+		cpuBox,
+		memBox,
+		tempBox,
 		labelStyle.Render("\nPressione 'q' para sair."),
 	)
+
+	m.zm.Scan(body)
 
 	return body
 }
