@@ -2,10 +2,13 @@ package adapter
 
 import (
 	"context"
+
 	"github.com/eldius/rpi-system-monitor/internal/model"
 	"github.com/eldius/rpi-system-monitor/internal/persistence"
 	"github.com/eldius/rpi-system-monitor/internal/telemetry"
 )
+
+type MeasureFunc func(ctx context.Context) (model.ProbesResult, error)
 
 func Measure(ctx context.Context) (model.ProbesResult, error) {
 	probesResult := telemetry.Measure(ctx)

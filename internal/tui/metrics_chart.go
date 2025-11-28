@@ -139,6 +139,7 @@ func initialModel(ctx context.Context) *hostMetricsDisplayModel {
 		memChart:  &memChart,
 		tempChart: &tempChart,
 		ctx:       ctx,
+		zm:        zm,
 	}
 
 	return &m
@@ -154,6 +155,8 @@ func setupMetricChart(c *timeserieslinechart.Model, zm *zone.Manager) {
 	c.SetStyle(graphLineStyle1)
 	c.SetLineStyle(runes.ThinLineStyle) // ThinLineStyle replaces default linechart arcline rune style
 	c.SetZoneManager(zm)
+
+	c.DrawXYAxisAndLabel()
 }
 
 // --- Métodos do Bubble Tea ---
@@ -191,6 +194,10 @@ func (m *hostMetricsDisplayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cpuChart.Push(cpuVal)
 		m.memChart.Push(memVal)
 		m.tempChart.Push(tempVal)
+
+		m.cpuChart.Draw()
+		m.memChart.Draw()
+		m.tempChart.Draw()
 
 		s := lipgloss.JoinHorizontal(lipgloss.Top,
 			lipgloss.JoinVertical(lipgloss.Left,

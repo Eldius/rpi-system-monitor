@@ -3,15 +3,23 @@ package simple_charts
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/NimbleMarkets/ntcharts/canvas/runes"
 	"github.com/NimbleMarkets/ntcharts/linechart/timeserieslinechart"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/eldius/rpi-system-monitor/internal/adapter"
 	zone "github.com/lrstanley/bubblezone"
+	"golang.org/x/term"
 )
+
+var borderStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("63")).
+	Padding(0, 1)
 
 var defaultStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
@@ -29,71 +37,50 @@ var axisStyle = lipgloss.NewStyle().
 var labelStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("6")) // cyan
 
-var timePoint1 timeserieslinechart.TimePoint
-var randf1 float64
+type tickMsg time.Time
 
 type simpleChartsModel struct {
-	c1 timeserieslinechart.Model
-	zM *zone.Manager
+	cpuChart timeserieslinechart.Model
+	zM       *zone.Manager
+	mf       adapter.MeasureFunc
+	ctx      context.Context
+
+	lastTimestamp time.Time
 }
 
 func (m simpleChartsModel) Init() tea.Cmd {
-	m.c1.DrawXYAxisAndLabel()
-	return nil
+	m.cpuChart.DrawXYAxisAndLabel()
+	return tea.Batch(
+		tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+			return tickMsg(t)
+		}),
+	)
 }
 
 func (m simpleChartsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	addPoint := false
-	forwardMsg := false
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "r":
-			m.c1.ClearAllData()
-			m.c1.Clear()
-			m.c1.DrawXYAxisAndLabel()
-
-			return m, nil
-		case "up", "down", "left", "right", "pgup", "pgdown":
-			forwardMsg = true
-		case "q", "ctrl+c":
+		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
-		default:
-			addPoint = true
 		}
-	case tea.MouseMsg:
-		if msg.Action == tea.MouseActionPress {
-			m.c1.Blur()
 
-			// switch to whichever canvas was clicked on
-			switch {
-			case m.zM.Get(m.c1.ZoneID()).InBounds(msg):
-				m.c1.Focus()
-			}
+	case tickMsg:
+		mf, err := m.mf(m.ctx)
+		if err != nil {
+			fmt.Println(err)
+			return m, tea.Quit
 		}
-		forwardMsg = true
-	}
-	if addPoint {
-		// generate random numbers within the given Y value range
-		//rangeNumbers := m.tslc2.MaxY() - m.tslc2.MinY()
-		rangeNumbers := float64(100)
-		randf1 = rand.Float64()*rangeNumbers + m.c1.MinY()
+		slog.With("cpu_usage", mf.CPU.CPUUsage).Debug("pushing cpu usage data")
+		m.lastTimestamp = mf.Timestamp
+		m.cpuChart.Push(timeserieslinechart.TimePoint{
+			Time:  mf.Timestamp,
+			Value: mf.Memory.MemoryUsagePercentage,
+		})
 
-		now := time.Now()
-		timePoint1 = timeserieslinechart.TimePoint{Time: now, Value: randf1}
+		m.cpuChart.Draw()
 
-		// timeserieslinechart 1 and 3 pushes random value randf1 to default data set
-		m.c1.Push(timePoint1)
-
-		m.c1.Draw()
-	}
-	// timeserieslinechart handles mouse events
-	if forwardMsg {
-		switch {
-		case m.c1.Focused():
-			m.c1, _ = m.c1.Update(msg)
-			m.c1.Draw()
-		}
+		return m, tickCmd()
 	}
 	return m, nil
 }
@@ -102,19 +89,48 @@ func (m simpleChartsModel) View() string {
 	s := "any key to push randomized data value,`r` to clear data, `q/ctrl+c` to quit\n"
 	s += "pgup/pdown/mouse wheel scroll to zoom in and out along X axis\n"
 	s += "mouse click+drag or arrow keys to move view along X axis while zoomed in\n"
-	s += lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.JoinVertical(lipgloss.Left,
-			defaultStyle.Render(fmt.Sprintf("ts:%s, f1:(%.02f)\n", timePoint1.Time.UTC().Format("15:04:05"), randf1)+m.c1.View()),
-		),
+	s += "Latest update: " + m.lastTimestamp.Format(time.DateTime) + "\n"
+	s += borderStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Left, labelStyle.Render("CPU Usage (%)"), m.cpuChart.View()),
 	) + "\n"
 	return m.zM.Scan(s) // call zone Manager.Scan() at root model
 }
 
+func tickCmd() tea.Cmd {
+	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
 func Start(ctx context.Context) error {
 	width := 36
 	height := 8
 	minYValue := 0.0
 	maxYValue := 100.0
+
+	var windowSize struct {
+		Width  int
+		Height int
+	}
+
+	fd := int(os.Stdin.Fd())
+
+	// Check if the file descriptor is a terminal
+	if term.IsTerminal(fd) {
+		// Get the terminal size
+		w, h, err := term.GetSize(fd)
+		if err != nil {
+			fmt.Printf("Error getting terminal size: %v\n", err)
+			return err
+		}
+
+		windowSize.Width = 3 * (w / 4)
+		windowSize.Height = 3 * (h / 4)
+		fmt.Printf("Terminal dimensions: Width = %d, Height = %d\n", w, h)
+	} else {
+		fmt.Println("Not running in a terminal.")
+		windowSize.Width = width
+		windowSize.Height = height
+	}
 
 	// timeserieslinecharts creates line charts starting with time as time.Now()
 	// There are two sets of charts, one show regular lines and one showing braille lines
@@ -124,20 +140,23 @@ func Start(ctx context.Context) error {
 	zoneManager := zone.New()
 
 	// timeserieslinechart 1 created with New() and setting options afterwards
-	tslc1 := timeserieslinechart.New(width, height)
-	tslc1.AxisStyle = axisStyle
-	tslc1.LabelStyle = labelStyle
-	tslc1.XLabelFormatter = timeserieslinechart.HourTimeLabelFormatter()
-	tslc1.UpdateHandler = timeserieslinechart.SecondUpdateHandler(1)
-	tslc1.SetYRange(minYValue, maxYValue)     // set expected Y values (values can be less or greater than what is displayed)
-	tslc1.SetViewYRange(minYValue, maxYValue) // setting display Y values will fail unless set expected Y values first
-	tslc1.SetStyle(graphLineStyle1)
-	tslc1.SetLineStyle(runes.ThinLineStyle) // ThinLineStyle replaces default linechart arcline rune style
-	tslc1.SetZoneManager(zoneManager)
-	tslc1.Focus()
+	cpuChart := timeserieslinechart.New(windowSize.Width, windowSize.Height)
+	cpuChart.AxisStyle = axisStyle
+	cpuChart.LabelStyle = labelStyle
+	cpuChart.XLabelFormatter = timeserieslinechart.HourTimeLabelFormatter()
+	cpuChart.UpdateHandler = timeserieslinechart.SecondUpdateHandler(1)
+	cpuChart.SetYRange(minYValue, maxYValue)     // set expected Y values (values can be less or greater than what is displayed)
+	cpuChart.SetViewYRange(minYValue, maxYValue) // setting display Y values will fail unless set expected Y values first
+	cpuChart.SetStyle(graphLineStyle1)
+	cpuChart.SetLineStyle(runes.ThinLineStyle) // ThinLineStyle replaces default linechart arcline rune style
+	cpuChart.SetZoneManager(zoneManager)
+	cpuChart.Focus()
 
-	m := simpleChartsModel{c1: tslc1,
-		zM: zoneManager,
+	m := simpleChartsModel{
+		cpuChart: cpuChart,
+		zM:       zoneManager,
+		mf:       adapter.Measure,
+		ctx:      ctx,
 	}
 	if _, err := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
 		err = fmt.Errorf("executing screen: %w", err)
